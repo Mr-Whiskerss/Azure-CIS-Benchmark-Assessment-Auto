@@ -1,7 +1,16 @@
-# Azure-CIS-Benchmark-Assessment-Auto
-A single-file Bash tool that audits an Azure subscription against the [CIS Microsoft Azure Foundations Benchmark](https://www.cisecurity.org/benchmark/azure) and produces a pentest-ready report in both HTML and JSON. Every check captures the exact command run and its raw output as a traceable evidence artifact.
+# Azure CIS Benchmark Assessment
+
+A single-file Bash tool that audits an Azure subscription against the [CIS Microsoft Azure Foundations Benchmark **v6.0.0**](https://www.cisecurity.org/benchmark/azure) and produces a pentest-ready report in both HTML and JSON. Every check captures the exact command run and its raw output as a traceable evidence artifact.
 
 Built for read-only security assessments — it makes no changes to the target environment.
+
+## Benchmark coverage
+
+Checks map to controls in the **CIS Microsoft Azure Foundations Benchmark v6.0.0**, across its nine sections: Identity & Access Management, Microsoft Defender for Cloud, Storage Accounts, Database Services, Logging & Monitoring, Networking, Virtual Machines, Key Vault, and AppService.
+
+Control IDs in the report follow v6.0.0 numbering (e.g. Defender plans at `2.1.x`, SQL at `4.1.x`). Some IDs use `.x` to denote a section-level or Manual control where no single automated check maps one-to-one. Checks prefixed **`EXT-`** are extended checks that provide security value but have no direct CIS control (e.g. Azure Firewall presence, AKS RBAC, resource locks) — these are clearly distinguished in the report. See [CIS_v6_MAPPING.md](CIS_v6_MAPPING.md) for the full control mapping.
+
+> This tool maps to CIS controls but is not a certified CIS assessment and does not replace the official [CIS-CAT](https://www.cisecurity.org/cybersecurity-tools/cis-cat-pro) tooling.
 
 ## Features
 
@@ -15,7 +24,7 @@ Built for read-only security assessments — it makes no changes to the target e
 
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) (`az`)
 - [`jq`](https://jqlang.github.io/jq/)
-- `python3` 
+- `python3` (used for HTML generation; ships with most Linux/macOS systems)
 
 The script checks for all three at startup and exits cleanly if any are missing.
 
@@ -146,7 +155,6 @@ A `MANUAL` or `ERROR` result is not a pass — it means the tool could not make 
 ## Limitations
 
 - The tool assesses what the authenticated identity can see. Findings are only as complete as the granted permissions.
-- It maps to CIS controls but is not a certified CIS assessment and does not replace the official [CIS-CAT](https://www.cisecurity.org/cybersecurity-tools/cis-cat-pro) tooling.
 - A `PASS` reflects the configuration state at scan time only.
 - Designed for single-subscription assessments; run once per subscription for multi-subscription tenants.
 
