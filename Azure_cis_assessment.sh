@@ -2,8 +2,8 @@
 # =============================================================================
 # Azure CIS Benchmark Assessment Script
 # Author: URM Consulting - Penetration Testing
-# Version: 1.0
-# Description: Full Azure tenant CIS benchmark assessment with HTML/JSON output
+# Version: 2.0
+# Description: Azure CIS Foundations Benchmark v6.0.0 assessment with HTML/JSON output
 # =============================================================================
 
 set -euo pipefail
@@ -46,7 +46,7 @@ err()  { echo -e "${RED}[ERROR]${RESET} $*" | tee -a "$LOG_FILE"; }
 banner() {
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║          Azure CIS Benchmark Assessment Tool v1.0               ║"
+    echo "║     Azure CIS Foundations Benchmark v6.0.0 — Tool v2.0          ║"
     echo "║                   URM Consulting                                ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${RESET}"
@@ -239,17 +239,17 @@ assess_iam() {
     guests=$(az_query ad user list --filter "userType eq 'Guest'" --query "length(@)" -o tsv 2>/dev/null || echo "unknown")
     if [[ "$guests" == "0" ]]; then
         pass "1.2 No guest users found"
-        add_finding "1.2" "IAM" "Guest User Presence" "PASS" "Low" "No guest users present in tenant." "" "CIS 1.6"
+        add_finding "1.5" "IAM" "Guest User Presence" "PASS" "Low" "No guest users present in tenant." "" "CIS 1.5"
     elif [[ "$guests" == "unknown" ]]; then
         warn "1.2 Could not enumerate guest users"
-        add_finding "1.2" "IAM" "Guest User Presence" "ERROR" "Medium" "Failed to enumerate guest users." \
-            "Manually review Entra ID > Users > Filter by Guest" "CIS 1.6"
+        add_finding "1.5" "IAM" "Guest User Presence" "ERROR" "Medium" "Failed to enumerate guest users." \
+            "Manually review Entra ID > Users > Filter by Guest" "CIS 1.5"
     else
         warn "1.2 $guests guest user(s) found — review access"
-        add_finding "1.2" "IAM" "Guest User Presence" "WARN" "Medium" \
+        add_finding "1.5" "IAM" "Guest User Presence" "WARN" "Medium" \
             "$guests guest user(s) found. Review whether access is appropriate and time-limited." \
             "Review guest user access. Restrict guest permissions via External Collaboration Settings." \
-            "CIS 1.6 | https://learn.microsoft.com/en-us/azure/active-directory/external-identities/"
+            "CIS 1.5 | https://learn.microsoft.com/en-us/azure/active-directory/external-identities/"
     fi
 
     # 1.3 — Global Administrators count
@@ -269,18 +269,18 @@ assess_iam() {
     if [[ "$ga_count" -le 4 && "$ga_count" -ge 2 ]] 2>/dev/null; then
         pass "1.3 Global Administrator count is $ga_count (within recommended 2-4 range)"
         add_finding "1.3" "IAM" "Global Administrator Count" "PASS" "Info" \
-            "$ga_count Global Administrators found. CIS recommends between 2 and 4." "" "CIS 1.15"
+            "$ga_count Global Administrators found. CIS recommends between 2 and 4." "" "CIS 1.3"
     elif [[ "$ga_count" -gt 4 ]] 2>/dev/null; then
         fail "1.3 Excessive Global Administrators: $ga_count (CIS recommends 2-4)"
         add_finding "1.3" "IAM" "Global Administrator Count" "FAIL" "High" \
             "$ga_count Global Administrators found. This exceeds the CIS recommended maximum of 4 and increases the blast radius of a compromised account." \
             "Reduce Global Administrators to 2-4. Use PIM for eligible assignment rather than permanent. Assign least-privilege roles." \
-            "CIS 1.15 | https://learn.microsoft.com/en-us/azure/active-directory/roles/best-practices"
+            "CIS 1.3 | https://learn.microsoft.com/en-us/azure/active-directory/roles/best-practices"
     else
         warn "1.3 Could not determine GA count or count is below 2"
         add_finding "1.3" "IAM" "Global Administrator Count" "WARN" "Medium" \
             "GA count: $ga_count. CIS recommends at least 2 for redundancy." \
-            "Ensure at least 2 Global Administrators exist for break-glass scenarios." "CIS 1.15"
+            "Ensure at least 2 Global Administrators exist for break-glass scenarios." "CIS 1.3"
     fi
 
     # 1.4 — No subscription-level Owner service principals
@@ -292,16 +292,16 @@ assess_iam() {
 
     if [[ -z "$sp_owners" ]]; then
         pass "1.4 No service principals with Owner role found"
-        add_finding "1.4" "IAM" "Service Principal Owner Assignments" "PASS" "Info" \
-            "No service principals hold the Owner role at subscription level." "" "CIS 1.21"
+        add_finding "1.23" "IAM" "Service Principal Owner Assignments" "PASS" "Info" \
+            "No service principals hold the Owner role at subscription level." "" "CIS 1.23"
     else
         local count
         count=$(echo "$sp_owners" | grep -c . || true)
         fail "1.4 $count service principal(s) with Owner role: $sp_owners"
-        add_finding "1.4" "IAM" "Service Principal Owner Assignments" "FAIL" "Critical" \
+        add_finding "1.23" "IAM" "Service Principal Owner Assignments" "FAIL" "Critical" \
             "$count service principal(s) found with Owner rights: $sp_owners — exploitation of these SPs yields full subscription control." \
             "Replace Owner with the minimum required role. Use Contributor or custom roles. Audit SP credentials and rotation policy." \
-            "CIS 1.21 | https://learn.microsoft.com/en-us/azure/role-based-access-control/best-practices" \
+            "CIS 1.23 | https://learn.microsoft.com/en-us/azure/role-based-access-control/best-practices" \
             "$(echo "$sp_owners" | tr '\n' ',' | sed 's/,/, /g; s/, *$//; s/^ *//')"
     fi
 
@@ -317,16 +317,16 @@ assess_iam() {
 
     if [[ "$priv_count" -eq 0 ]]; then
         pass "1.5 No permanent Owner/Contributor/UAA assignments found"
-        add_finding "1.5" "IAM" "Permanent Privileged Role Assignments" "PASS" "Info" \
-            "No permanent high-privilege role assignments detected." "" "CIS 1.14"
+        add_finding "1.1.x" "IAM" "Permanent Privileged Role Assignments" "PASS" "Info" \
+            "No permanent high-privilege role assignments detected." "" "CIS 1.1.x"
     else
         warn "1.5 $priv_count permanent privileged role assignment(s) found"
         local summary
         summary=$(echo "$permanent_privs" | jq -r '.[] | "\(.Type): \(.Name) — \(.Role)"' | head -20 | tr '\n' '; ')
-        add_finding "1.5" "IAM" "Permanent Privileged Role Assignments" "WARN" "High" \
+        add_finding "1.1.x" "IAM" "Permanent Privileged Role Assignments" "WARN" "High" \
             "$priv_count permanent high-privilege assignments: $summary" \
             "Use Azure PIM for eligible (time-bound, approval-based) role assignments. Remove standing access for privileged roles." \
-            "CIS 1.14 | https://learn.microsoft.com/en-us/azure/active-directory/privileged-identity-management/"
+            "CIS 1.1.x | https://learn.microsoft.com/en-us/azure/active-directory/privileged-identity-management/"
     fi
 }
 
@@ -343,24 +343,37 @@ assess_defender() {
 
     local plans=("VirtualMachines" "SqlServers" "AppServices" "StorageAccounts" "Containers" "KeyVaults" "Dns" "Arm")
 
+    # CIS v6.0.0 control IDs per Defender plan
+    declare -A plan_cis=(
+        ["VirtualMachines"]="2.1.1"
+        ["AppServices"]="2.1.2"
+        ["SqlServers"]="2.1.4"
+        ["StorageAccounts"]="2.1.5"
+        ["Containers"]="2.1.7"
+        ["KeyVaults"]="2.1.10"
+        ["Arm"]="2.1.12"
+        ["Dns"]="2.1.13"
+    )
+
     for plan in "${plans[@]}"; do
+        local cis_ref="${plan_cis[$plan]:-2.1.x}"
         local tier
         tier=$(echo "$pricing" | jq -r --arg p "$plan" '.[] | select(.name==$p) | .pricingTier' 2>/dev/null || echo "unknown")
         if [[ "$tier" == "Standard" ]]; then
-            pass "2.x Defender for $plan: Standard (enabled)"
-            add_finding "2.${plan}" "Defender" "Defender for $plan" "PASS" "Info" \
-                "Defender for $plan is enabled (Standard tier)." "" "CIS 2.x"
+            pass "${cis_ref} Defender for $plan: Standard (enabled)"
+            add_finding "${cis_ref}" "Defender" "Defender for $plan" "PASS" "Info" \
+                "Defender for $plan is enabled (Standard tier)." "" "CIS ${cis_ref}"
         elif [[ "$tier" == "Free" ]]; then
-            fail "2.x Defender for $plan: Free tier (disabled)"
-            add_finding "2.${plan}" "Defender" "Defender for $plan" "FAIL" "High" \
+            fail "${cis_ref} Defender for $plan: Free tier (disabled)"
+            add_finding "${cis_ref}" "Defender" "Defender for $plan" "FAIL" "High" \
                 "Defender for $plan is on Free tier — no threat detection active for this workload." \
                 "Upgrade to Standard tier. Review cost implications and enable at minimum for internet-facing or data workloads." \
-                "CIS 2.x | https://learn.microsoft.com/en-us/azure/defender-for-cloud/"
+                "CIS ${cis_ref} | https://learn.microsoft.com/en-us/azure/defender-for-cloud/"
         else
-            warn "2.x Defender for $plan: Unknown/error ($tier)"
-            add_finding "2.${plan}" "Defender" "Defender for $plan" "ERROR" "Medium" \
+            warn "${cis_ref} Defender for $plan: Unknown/error ($tier)"
+            add_finding "${cis_ref}" "Defender" "Defender for $plan" "ERROR" "Medium" \
                 "Could not determine Defender plan status for $plan." \
-                "Verify via Azure Portal > Defender for Cloud > Environment Settings." "CIS 2.x"
+                "Verify via Azure Portal > Defender for Cloud > Environment Settings." "CIS ${cis_ref}"
         fi
     done
 
@@ -429,16 +442,16 @@ assess_storage() {
     public_blob=$(echo "$accounts" | jq '[.[] | select(.allowBlobPublicAccess==true)] | length' 2>/dev/null || echo "0")
     if [[ "$public_blob" -eq 0 ]]; then
         pass "3.2 No storage accounts with public blob access"
-        add_finding "3.2" "Storage" "Public Blob Access" "PASS" "Info" \
-            "No storage accounts allow public blob access." "" "CIS 3.5"
+        add_finding "3.7" "Storage" "Public Blob Access" "PASS" "Info" \
+            "No storage accounts allow public blob access." "" "CIS 3.7"
     else
         fail "3.2 $public_blob storage account(s) allow public blob access"
         local pub_names
         pub_names=$(echo "$accounts" | jq -r '[.[] | select(.allowBlobPublicAccess==true) | .name] | join(", ")' 2>/dev/null)
-        add_finding "3.2" "Storage" "Public Blob Access" "FAIL" "Critical" \
+        add_finding "3.7" "Storage" "Public Blob Access" "FAIL" "Critical" \
             "$public_blob account(s) allow public blob access: $pub_names — unauthenticated data exposure risk." \
             "Disable public blob access unless explicitly required. Audit existing public containers for sensitive data." \
-            "CIS 3.5 | https://learn.microsoft.com/en-us/azure/storage/blobs/anonymous-read-access-prevent" \
+            "CIS 3.7 | https://learn.microsoft.com/en-us/azure/storage/blobs/anonymous-read-access-prevent" \
             "$pub_names"
     fi
 
@@ -447,14 +460,14 @@ assess_storage() {
     old_tls=$(echo "$accounts" | jq '[.[] | select(.minimumTlsVersion!="TLS1_2")] | length' 2>/dev/null || echo "0")
     if [[ "$old_tls" -eq 0 ]]; then
         pass "3.3 All storage accounts require TLS 1.2"
-        add_finding "3.3" "Storage" "Storage Minimum TLS Version" "PASS" "Info" \
-            "All storage accounts enforce TLS 1.2." "" "CIS 3.2"
+        add_finding "3.12" "Storage" "Storage Minimum TLS Version" "PASS" "Info" \
+            "All storage accounts enforce TLS 1.2." "" "CIS 3.12"
     else
         fail "3.3 $old_tls storage account(s) allow TLS below 1.2"
-        add_finding "3.3" "Storage" "Storage Minimum TLS Version" "FAIL" "High" \
+        add_finding "3.12" "Storage" "Storage Minimum TLS Version" "FAIL" "High" \
             "$old_tls account(s) do not enforce TLS 1.2 minimum — vulnerable to downgrade attacks." \
             "Set minimumTlsVersion to TLS1_2 on all storage accounts." \
-            "CIS 3.2 | https://learn.microsoft.com/en-us/azure/storage/common/transport-layer-security-configure-minimum-version"
+            "CIS 3.12 | https://learn.microsoft.com/en-us/azure/storage/common/transport-layer-security-configure-minimum-version"
     fi
 
     # 3.4 — Soft delete for blobs
@@ -476,14 +489,14 @@ assess_storage() {
 
     if [[ "$no_softdelete" -eq 0 ]]; then
         pass "3.4 Blob soft delete enabled on all storage accounts"
-        add_finding "3.4" "Storage" "Blob Soft Delete" "PASS" "Info" \
-            "Blob soft delete is enabled across all storage accounts." "" "CIS 3.8"
+        add_finding "3.11" "Storage" "Blob Soft Delete" "PASS" "Info" \
+            "Blob soft delete is enabled across all storage accounts." "" "CIS 3.11"
     else
         fail "3.4 $no_softdelete storage account(s) missing blob soft delete"
-        add_finding "3.4" "Storage" "Blob Soft Delete" "FAIL" "Medium" \
+        add_finding "3.11" "Storage" "Blob Soft Delete" "FAIL" "Medium" \
             "$no_softdelete account(s) do not have blob soft delete enabled — accidental/malicious deletion is unrecoverable." \
             "Enable blob soft delete with at least 7 day retention on all storage accounts." \
-            "CIS 3.8 | https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-blob-overview"
+            "CIS 3.11 | https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-blob-overview"
     fi
 }
 
@@ -519,14 +532,14 @@ assess_sql() {
             --query "state" -o tsv 2>/dev/null || echo "Unknown")
         if [[ "$audit" == "Enabled" ]]; then
             pass "4.1 [$srv_name] SQL Auditing enabled"
-            add_finding "4.1.${srv_name}" "SQL" "SQL Auditing: $srv_name" "PASS" "Info" \
-                "SQL auditing is enabled on $srv_name." "" "CIS 4.1"
+            add_finding "4.1.1.${srv_name}" "SQL" "SQL Auditing: $srv_name" "PASS" "Info" \
+                "SQL auditing is enabled on $srv_name." "" "CIS 4.1.1"
         else
             fail "4.1 [$srv_name] SQL Auditing DISABLED"
-            add_finding "4.1.${srv_name}" "SQL" "SQL Auditing: $srv_name" "FAIL" "High" \
+            add_finding "4.1.1.${srv_name}" "SQL" "SQL Auditing: $srv_name" "FAIL" "High" \
                 "SQL auditing is disabled on $srv_name — no audit trail for database access/changes." \
                 "Enable SQL auditing and configure logs to ship to Log Analytics or Storage Account with 90+ day retention." \
-                "CIS 4.1 | https://learn.microsoft.com/en-us/azure/azure-sql/database/auditing-overview"
+                "CIS 4.1.1 | https://learn.microsoft.com/en-us/azure/azure-sql/database/auditing-overview"
         fi
 
         # 4.2 — Firewall rules (look for 0.0.0.0 - 255.255.255.255)
@@ -537,14 +550,14 @@ assess_sql() {
         open_fw=$(echo "$fw_rules" | jq '[.[] | select(.startIpAddress=="0.0.0.0" and .endIpAddress=="255.255.255.255")] | length' 2>/dev/null || echo "0")
         if [[ "$open_fw" -eq 0 ]]; then
             pass "4.2 [$srv_name] No unrestricted SQL firewall rules"
-            add_finding "4.2.${srv_name}" "SQL" "SQL Firewall Rules: $srv_name" "PASS" "Info" \
-                "No wildcard (0.0.0.0-255.255.255.255) firewall rules on $srv_name." "" "CIS 4.3"
+            add_finding "4.1.2.${srv_name}" "SQL" "SQL Firewall Rules: $srv_name" "PASS" "Info" \
+                "No wildcard (0.0.0.0-255.255.255.255) firewall rules on $srv_name." "" "CIS 4.1.2"
         else
             fail "4.2 [$srv_name] Unrestricted firewall rule detected"
-            add_finding "4.2.${srv_name}" "SQL" "SQL Firewall Rules: $srv_name" "FAIL" "Critical" \
+            add_finding "4.1.2.${srv_name}" "SQL" "SQL Firewall Rules: $srv_name" "FAIL" "Critical" \
                 "Wildcard firewall rule (0.0.0.0-255.255.255.255) found on $srv_name — database is internet-accessible." \
                 "Remove wildcard rules. Restrict access to specific known IP ranges or use Private Endpoints." \
-                "CIS 4.3 | https://learn.microsoft.com/en-us/azure/azure-sql/database/firewall-configure"
+                "CIS 4.1.2 | https://learn.microsoft.com/en-us/azure/azure-sql/database/firewall-configure"
         fi
 
         # 4.3 — Azure AD admin
@@ -554,14 +567,14 @@ assess_sql() {
             --query "length(@)" -o tsv 2>/dev/null || echo "0")
         if [[ "$ad_admin" -gt 0 ]] 2>/dev/null; then
             pass "4.3 [$srv_name] Azure AD admin configured"
-            add_finding "4.3.${srv_name}" "SQL" "SQL AAD Admin: $srv_name" "PASS" "Info" \
-                "Azure AD admin is configured on $srv_name." "" "CIS 4.4"
+            add_finding "4.1.5.${srv_name}" "SQL" "SQL AAD Admin: $srv_name" "PASS" "Info" \
+                "Azure AD admin is configured on $srv_name." "" "CIS 4.1.5"
         else
             fail "4.3 [$srv_name] No Azure AD admin configured"
-            add_finding "4.3.${srv_name}" "SQL" "SQL AAD Admin: $srv_name" "FAIL" "Medium" \
+            add_finding "4.1.5.${srv_name}" "SQL" "SQL AAD Admin: $srv_name" "FAIL" "Medium" \
                 "No Azure AD administrator configured on $srv_name — SQL-only authentication may allow credential-based attacks." \
                 "Configure an Azure AD administrator for SQL server. Disable SQL authentication where possible." \
-                "CIS 4.4 | https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-aad-configure"
+                "CIS 4.1.5 | https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-aad-configure"
         fi
 
     done < <(echo "$servers" | jq -c '.[]' 2>/dev/null)
@@ -605,7 +618,7 @@ assess_logging() {
     if [[ "$workspaces" -gt 0 ]] 2>/dev/null; then
         pass "5.2 $workspaces Log Analytics workspace(s) found"
         add_finding "5.2" "Logging" "Log Analytics Workspace" "PASS" "Info" \
-            "$workspaces Log Analytics workspace(s) configured." "" "CIS 5.x"
+            "$workspaces Log Analytics workspace(s) configured." "" "CIS 5.1.x"
     else
         fail "5.2 No Log Analytics workspaces found"
         add_finding "5.2" "Logging" "Log Analytics Workspace" "FAIL" "High" \
@@ -755,7 +768,7 @@ assess_networking() {
     if [[ "$ddos" -gt 0 ]] 2>/dev/null; then
         pass "6.3 DDoS protection plan configured"
         add_finding "6.3" "Networking" "DDoS Protection" "PASS" "Info" \
-            "Azure DDoS Protection plan is configured." "" "CIS 6.x"
+            "Azure DDoS Protection plan is configured." "" "CIS 6 (Manual)"
     else
         warn "6.3 No DDoS protection plan found"
         add_finding "6.3" "Networking" "DDoS Protection" "WARN" "Medium" \
@@ -770,11 +783,11 @@ assess_networking() {
     azfw=$(az_query network firewall list --query "length(@)" -o tsv 2>/dev/null || echo "0")
     if [[ "$azfw" -gt 0 ]] 2>/dev/null; then
         pass "6.4 Azure Firewall deployed"
-        add_finding "6.4" "Networking" "Azure Firewall" "PASS" "Info" \
-            "$azfw Azure Firewall instance(s) found." "" "CIS 6.x"
+        add_finding "EXT-NET1" "Networking" "Azure Firewall" "PASS" "Info" \
+            "$azfw Azure Firewall instance(s) found." "" "CIS 6 (Manual)"
     else
         warn "6.4 No Azure Firewall found"
-        add_finding "6.4" "Networking" "Azure Firewall" "WARN" "Low" \
+        add_finding "EXT-NET1" "Networking" "Azure Firewall" "WARN" "Low" \
             "No Azure Firewall detected. Network traffic filtering may rely solely on NSGs." \
             "Evaluate Azure Firewall or third-party NVA for centralised network traffic inspection and filtering." \
             "CIS 6.x | https://learn.microsoft.com/en-us/azure/firewall/overview"
@@ -797,7 +810,7 @@ assess_vms() {
 
     if [[ "$vm_count" -eq 0 ]]; then
         info "7.x No VMs found — skipping VM checks"
-        add_finding "7.0" "VirtualMachines" "VM Presence" "PASS" "Info" "No virtual machines found in scope." "" "CIS 7.x"
+        add_finding "7.0" "VirtualMachines" "VM Presence" "PASS" "Info" "No virtual machines found in scope." "" "Extended check (no CIS control)"
         return
     fi
 
@@ -841,11 +854,11 @@ assess_vms() {
     no_identity=$(echo "$vms" | jq '[.[] | select(.identity==null or .identity.type==null)] | length' 2>/dev/null || echo "0")
     if [[ "$no_identity" -eq 0 ]]; then
         pass "7.2 All VMs have managed identities configured"
-        add_finding "7.2" "VirtualMachines" "VM Managed Identity" "PASS" "Info" \
-            "All VMs have managed identities assigned." "" "CIS 7.x"
+        add_finding "EXT-VM1" "VirtualMachines" "VM Managed Identity" "PASS" "Info" \
+            "All VMs have managed identities assigned." "" "Extended check (no CIS control)"
     else
         warn "7.2 $no_identity VM(s) without managed identity"
-        add_finding "7.2" "VirtualMachines" "VM Managed Identity" "WARN" "Low" \
+        add_finding "EXT-VM1" "VirtualMachines" "VM Managed Identity" "WARN" "Low" \
             "$no_identity VM(s) do not have a managed identity — these may use stored credentials for Azure resource access." \
             "Assign system-assigned managed identities to VMs that need Azure resource access. Avoid storing credentials in VMs." \
             "CIS 7.x | https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/"
@@ -880,26 +893,26 @@ assess_keyvault() {
 
     if [[ "$no_softdelete" -eq 0 ]]; then
         pass "8.1 All Key Vaults have soft delete enabled"
-        add_finding "8.1" "KeyVault" "Key Vault Soft Delete" "PASS" "Info" \
-            "All $vault_count Key Vaults have soft delete enabled." "" "CIS 8.4"
+        add_finding "8.5" "KeyVault" "Key Vault Soft Delete" "PASS" "Info" \
+            "All $vault_count Key Vaults have soft delete enabled." "" "CIS 8.6"
     else
         fail "8.1 $no_softdelete Key Vault(s) missing soft delete"
-        add_finding "8.1" "KeyVault" "Key Vault Soft Delete" "FAIL" "High" \
+        add_finding "8.5" "KeyVault" "Key Vault Soft Delete" "FAIL" "High" \
             "$no_softdelete Key Vault(s) do not have soft delete enabled — deleted secrets/keys cannot be recovered." \
             "Enable soft delete on all Key Vaults. Note: Cannot be disabled once enabled." \
-            "CIS 8.4 | https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview"
+            "CIS 8.6 | https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview"
     fi
 
     if [[ "$no_purge" -eq 0 ]]; then
         pass "8.2 All Key Vaults have purge protection enabled"
-        add_finding "8.2" "KeyVault" "Key Vault Purge Protection" "PASS" "Info" \
-            "All $vault_count Key Vaults have purge protection enabled." "" "CIS 8.5"
+        add_finding "8.6" "KeyVault" "Key Vault Purge Protection" "PASS" "Info" \
+            "All $vault_count Key Vaults have purge protection enabled." "" "CIS 8.6"
     else
         fail "8.2 $no_purge Key Vault(s) missing purge protection"
-        add_finding "8.2" "KeyVault" "Key Vault Purge Protection" "FAIL" "High" \
+        add_finding "8.6" "KeyVault" "Key Vault Purge Protection" "FAIL" "High" \
             "$no_purge Key Vault(s) do not have purge protection — a compromised account could permanently destroy keys/secrets (ransomware risk)." \
             "Enable purge protection on all Key Vaults." \
-            "CIS 8.5 | https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview#purge-protection"
+            "CIS 8.6 | https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview#purge-protection"
     fi
 
     # 8.3 — RBAC vs access policies
@@ -970,14 +983,14 @@ assess_appservice() {
     http_apps=$(echo "$apps" | jq '[.[] | select(.httpsOnly!=true)] | length' 2>/dev/null || echo "0")
     if [[ "$http_apps" -eq 0 ]]; then
         pass "9.1 All App Services enforce HTTPS"
-        add_finding "9.1" "AppService" "App Service HTTPS Only" "PASS" "Info" \
-            "All $app_count App Services have HTTPS Only enabled." "" "CIS 9.1"
+        add_finding "9.2" "AppService" "App Service HTTPS Only" "PASS" "Info" \
+            "All $app_count App Services have HTTPS Only enabled." "" "CIS 9.2"
     else
         fail "9.1 $http_apps App Service(s) allow HTTP"
-        add_finding "9.1" "AppService" "App Service HTTPS Only" "FAIL" "High" \
+        add_finding "9.2" "AppService" "App Service HTTPS Only" "FAIL" "High" \
             "$http_apps App Service(s) do not enforce HTTPS — credentials and data transmitted in cleartext." \
             "Enable HTTPS Only on all App Services. Enforce minimum TLS 1.2." \
-            "CIS 9.1 | https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-bindings"
+            "CIS 9.2 | https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-bindings"
     fi
 
     # 9.2 — Remote debugging
@@ -998,11 +1011,11 @@ assess_appservice() {
 
     if [[ "$debug_on" -eq 0 ]]; then
         pass "9.2 Remote debugging disabled on all App Services"
-        add_finding "9.2" "AppService" "App Service Remote Debugging" "PASS" "Info" \
+        add_finding "9.6" "AppService" "App Service Remote Debugging" "PASS" "Info" \
             "Remote debugging is disabled across all App Services." "" "CIS 9.3"
     else
         fail "9.2 $debug_on App Service(s) have remote debugging enabled"
-        add_finding "9.2" "AppService" "App Service Remote Debugging" "FAIL" "High" \
+        add_finding "9.6" "AppService" "App Service Remote Debugging" "FAIL" "High" \
             "$debug_on App Service(s) have remote debugging enabled — exposes debugging endpoints that could be exploited." \
             "Disable remote debugging on all App Services in production." \
             "CIS 9.3 | https://learn.microsoft.com/en-us/azure/app-service/troubleshoot-dotnet-visual-studio"
@@ -1013,11 +1026,11 @@ assess_appservice() {
     no_identity_apps=$(echo "$apps" | jq '[.[] | select(.identity==null or .identity.type==null)] | length' 2>/dev/null || echo "0")
     if [[ "$no_identity_apps" -eq 0 ]]; then
         pass "9.3 All App Services have managed identities"
-        add_finding "9.3" "AppService" "App Service Managed Identity" "PASS" "Info" \
+        add_finding "9.5" "AppService" "App Service Managed Identity" "PASS" "Info" \
             "All App Services have managed identities configured." "" "CIS 9.x"
     else
         warn "9.3 $no_identity_apps App Service(s) without managed identity"
-        add_finding "9.3" "AppService" "App Service Managed Identity" "WARN" "Medium" \
+        add_finding "9.5" "AppService" "App Service Managed Identity" "WARN" "Medium" \
             "$no_identity_apps App Service(s) without managed identity — likely using stored credentials or connection strings." \
             "Enable system-assigned managed identities on all App Services requiring Azure resource access." \
             "CIS 9.x | https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity"
@@ -1041,11 +1054,11 @@ assess_appservice() {
 
     if [[ "$low_tls_apps" -eq 0 ]]; then
         pass "9.4 All App Services enforce TLS 1.2+"
-        add_finding "9.4" "AppService" "App Service Minimum TLS" "PASS" "Info" \
+        add_finding "9.3" "AppService" "App Service Minimum TLS" "PASS" "Info" \
             "All App Services enforce TLS 1.2 or higher." "" "CIS 9.x"
     else
         fail "9.4 $low_tls_apps App Service(s) allow TLS below 1.2"
-        add_finding "9.4" "AppService" "App Service Minimum TLS" "FAIL" "Medium" \
+        add_finding "9.3" "AppService" "App Service Minimum TLS" "FAIL" "Medium" \
             "$low_tls_apps App Service(s) permit TLS below 1.2 — vulnerable to protocol downgrade." \
             "Set minimum TLS version to 1.2 on all App Services." \
             "CIS 9.x | https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-bindings"
@@ -1071,14 +1084,14 @@ assess_appservice() {
 
     if [[ "$ftp_insecure" -eq 0 ]]; then
         pass "9.5 No App Services allow plain FTP"
-        add_finding "9.5" "AppService" "App Service FTP State" "PASS" "Info" \
+        add_finding "9.9" "AppService" "App Service FTP State" "PASS" "Info" \
             "No App Services allow insecure plain FTP deployments." "" "CIS 9.10"
     else
         fail "9.5 $ftp_insecure App Service(s) allow plain FTP: $ftp_names"
-        add_finding "9.5" "AppService" "App Service FTP State" "FAIL" "Medium" \
+        add_finding "9.9" "AppService" "App Service FTP State" "FAIL" "Medium" \
             "$ftp_insecure App Service(s) allow plaintext FTP: $ftp_names — credentials transmitted in cleartext." \
             "Set FTP state to 'FTPS Only' or 'Disabled' on all App Services." \
-            "CIS 9.10 | https://learn.microsoft.com/en-us/azure/app-service/deploy-ftp" \
+            "CIS 9.9 | https://learn.microsoft.com/en-us/azure/app-service/deploy-ftp" \
             "$(echo "$ftp_names" | sed 's/^[ ;]*//; s/[ ;]*$//; s/; */; /g')"
     fi
 
@@ -1100,14 +1113,14 @@ assess_appservice() {
 
     if [[ "$http1_apps" -eq 0 ]]; then
         pass "9.6 HTTP/2 enabled on all App Services"
-        add_finding "9.6" "AppService" "App Service HTTP/2" "PASS" "Info" \
-            "HTTP/2 is enabled on all App Services." "" "CIS 9.9"
+        add_finding "9.10" "AppService" "App Service HTTP/2" "PASS" "Info" \
+            "HTTP/2 is enabled on all App Services." "" "CIS 9.10"
     else
         warn "9.6 $http1_apps App Service(s) without HTTP/2"
-        add_finding "9.6" "AppService" "App Service HTTP/2" "WARN" "Low" \
+        add_finding "9.10" "AppService" "App Service HTTP/2" "WARN" "Low" \
             "$http1_apps App Service(s) do not have HTTP/2 enabled." \
             "Enable HTTP/2 for improved performance and security on all App Services." \
-            "CIS 9.9 | https://learn.microsoft.com/en-us/azure/app-service/configure-common"
+            "CIS 9.10 | https://learn.microsoft.com/en-us/azure/app-service/configure-common"
     fi
 }
 
@@ -1124,14 +1137,14 @@ assess_governance() {
     policies=$(az_query policy assignment list --query "length(@)" -o tsv 2>/dev/null || echo "0")
     if [[ "$policies" -gt 0 ]] 2>/dev/null; then
         pass "10.1 $policies Azure Policy assignment(s) found"
-        add_finding "10.1" "Governance" "Azure Policy Assignments" "PASS" "Info" \
-            "$policies Azure Policy assignments are in place for governance enforcement." "" "CIS 10.x"
+        add_finding "EXT-GOV1" "Governance" "Azure Policy Assignments" "PASS" "Info" \
+            "$policies Azure Policy assignments are in place for governance enforcement." "" "Extended check (no CIS control)"
     else
         warn "10.1 No Azure Policy assignments found"
-        add_finding "10.1" "Governance" "Azure Policy Assignments" "WARN" "Medium" \
+        add_finding "EXT-GOV1" "Governance" "Azure Policy Assignments" "WARN" "Medium" \
             "No Azure Policy assignments detected — no automated governance/compliance enforcement is configured." \
             "Assign Azure Policy initiatives (e.g. CIS, Azure Security Benchmark) to enforce baseline compliance." \
-            "CIS 10.x | https://learn.microsoft.com/en-us/azure/governance/policy/overview"
+            "Extended check (no CIS control)"
     fi
 
     # 10.2 — Resource locks on critical resource groups
@@ -1140,14 +1153,14 @@ assess_governance() {
     locks=$(az_query lock list --query "length(@)" -o tsv 2>/dev/null || echo "0")
     if [[ "$locks" -gt 0 ]] 2>/dev/null; then
         pass "10.2 $locks resource lock(s) configured"
-        add_finding "10.2" "Governance" "Resource Locks" "PASS" "Info" \
-            "$locks resource lock(s) protect against accidental deletion/modification." "" "CIS 10.x"
+        add_finding "EXT-GOV2" "Governance" "Resource Locks" "PASS" "Info" \
+            "$locks resource lock(s) protect against accidental deletion/modification." "" "Extended check (no CIS control)"
     else
         warn "10.2 No resource locks found"
-        add_finding "10.2" "Governance" "Resource Locks" "WARN" "Low" \
+        add_finding "EXT-GOV2" "Governance" "Resource Locks" "WARN" "Low" \
             "No resource locks configured — critical resources are vulnerable to accidental or malicious deletion." \
             "Apply CanNotDelete or ReadOnly locks on production resource groups and critical resources." \
-            "CIS 10.x | https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources"
+            "Extended check (no CIS control)"
     fi
 
     # 10.3 — Management groups
@@ -1156,14 +1169,14 @@ assess_governance() {
     mgmt_groups=$(az_query account management-group list --query "length(@)" -o tsv 2>/dev/null || echo "0")
     if [[ "$mgmt_groups" -gt 0 ]] 2>/dev/null; then
         pass "10.3 Management group hierarchy in use ($mgmt_groups groups)"
-        add_finding "10.3" "Governance" "Management Groups" "PASS" "Info" \
-            "$mgmt_groups management group(s) provide hierarchical governance." "" "CIS 10.x"
+        add_finding "EXT-GOV3" "Governance" "Management Groups" "PASS" "Info" \
+            "$mgmt_groups management group(s) provide hierarchical governance." "" "Extended check (no CIS control)"
     else
         info "10.3 No custom management groups (single subscription may not require them)"
-        add_finding "10.3" "Governance" "Management Groups" "MANUAL" "Low" \
+        add_finding "EXT-GOV3" "Governance" "Management Groups" "MANUAL" "Low" \
             "No custom management groups found. For single-tenant single-subscription setups this may be acceptable." \
             "For multi-subscription environments, use management groups to apply policy and RBAC at scale." \
-            "CIS 10.x | https://learn.microsoft.com/en-us/azure/governance/management-groups/overview"
+            "Extended check (no CIS control)"
     fi
 }
 
@@ -1181,16 +1194,16 @@ assess_entra_advanced() {
         --query "[?length(passwordCredentials) > \`0\`] | length(@)" -o tsv 2>/dev/null || echo "unknown")
     if [[ "$apps_with_creds" == "0" ]]; then
         pass "11.1 No app registrations with password credentials"
-        add_finding "11.1" "EntraID" "App Registration Secrets" "PASS" "Info" \
+        add_finding "EXT-EID1" "EntraID" "App Registration Secrets" "PASS" "Info" \
             "No app registrations rely on client secret credentials." "" "CIS 1.x"
     elif [[ "$apps_with_creds" == "unknown" ]]; then
         warn "11.1 Could not enumerate app credentials"
-        add_finding "11.1" "EntraID" "App Registration Secrets" "ERROR" "Medium" \
+        add_finding "EXT-EID1" "EntraID" "App Registration Secrets" "ERROR" "Medium" \
             "Failed to enumerate app registration credentials — check permissions." \
             "Review app registrations manually for long-lived secrets." "CIS 1.x"
     else
         warn "11.1 $apps_with_creds app registration(s) use password credentials"
-        add_finding "11.1" "EntraID" "App Registration Secrets" "WARN" "Medium" \
+        add_finding "EXT-EID1" "EntraID" "App Registration Secrets" "WARN" "Medium" \
             "$apps_with_creds app registration(s) use client secrets — prefer certificate credentials or managed identities." \
             "Migrate to certificate-based credentials or managed identities. Audit secret expiry and rotation." \
             "CIS 1.x | https://learn.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal"
@@ -1204,16 +1217,16 @@ assess_entra_advanced() {
         --query "defaultUserRolePermissions.allowedToCreateApps" -o tsv 2>/dev/null || echo "unknown")
     if [[ "$user_can_register" == "false" ]]; then
         pass "11.2 Users cannot register applications"
-        add_finding "11.2" "EntraID" "User App Registration" "PASS" "Info" \
+        add_finding "1.11" "EntraID" "User App Registration" "PASS" "Info" \
             "Standard users are not permitted to register applications." "" "CIS 1.11"
     elif [[ "$user_can_register" == "true" ]]; then
         fail "11.2 Users CAN register applications"
-        add_finding "11.2" "EntraID" "User App Registration" "FAIL" "Medium" \
+        add_finding "1.11" "EntraID" "User App Registration" "FAIL" "Medium" \
             "Any user can register applications — increases attack surface for consent phishing and rogue apps." \
             "Restrict app registration to administrators in Entra ID > User Settings." \
             "CIS 1.11 | https://learn.microsoft.com/en-us/azure/active-directory/roles/delegate-app-roles"
     else
-        add_finding "11.2" "EntraID" "User App Registration" "MANUAL" "Medium" \
+        add_finding "1.11" "EntraID" "User App Registration" "MANUAL" "Medium" \
             "Could not determine app registration policy via CLI." \
             "Verify in Entra ID > User Settings > App registrations." "CIS 1.11"
     fi
@@ -1228,11 +1241,11 @@ assess_entra_advanced() {
     consent_count=$(echo "$consent_policy" | jq 'length' 2>/dev/null || echo "0")
     if [[ "$consent_count" -eq 0 ]]; then
         pass "11.3 User consent to apps is restricted"
-        add_finding "11.3" "EntraID" "User Consent to Apps" "PASS" "Info" \
+        add_finding "1.x" "EntraID" "User Consent to Apps" "PASS" "Info" \
             "Users cannot independently consent to third-party applications." "" "CIS 1.x"
     else
         warn "11.3 Users may be able to consent to applications"
-        add_finding "11.3" "EntraID" "User Consent to Apps" "WARN" "Medium" \
+        add_finding "1.x" "EntraID" "User Consent to Apps" "WARN" "Medium" \
             "User consent permission grant policies are assigned — users may grant data access to third-party apps (consent phishing risk)." \
             "Require admin consent for apps accessing company data. Configure consent settings in Entra ID > Enterprise Applications." \
             "CIS 1.x | https://learn.microsoft.com/en-us/azure/active-directory/manage-apps/configure-user-consent"
@@ -1245,7 +1258,7 @@ assess_entra_advanced() {
         --url "https://graph.microsoft.com/v1.0/roleManagement/directory/roleDefinitions?\$filter=isBuiltIn eq false" \
         --query "value | length(@)" -o tsv 2>/dev/null || echo "0")
     info "11.4 $custom_roles custom directory role(s) found"
-    add_finding "11.4" "EntraID" "Custom Directory Roles" "MANUAL" "Low" \
+    add_finding "EXT-EID2" "EntraID" "Custom Directory Roles" "MANUAL" "Low" \
         "$custom_roles custom directory roles defined. Review each for least-privilege adherence." \
         "Audit custom directory roles to ensure they do not grant excessive permissions." \
         "CIS 1.x | https://learn.microsoft.com/en-us/azure/active-directory/roles/custom-overview"
@@ -1266,11 +1279,11 @@ assess_data_resources() {
     unattached=$(echo "$disks" | jq '[.[] | select(.diskState=="Unattached")] | length' 2>/dev/null || echo "0")
     if [[ "$unattached" -eq 0 ]]; then
         pass "12.1 No unattached managed disks"
-        add_finding "12.1" "DataResources" "Unattached Managed Disks" "PASS" "Info" \
-            "No unattached managed disks present." "" "CIS 7.x"
+        add_finding "EXT-DISK1" "DataResources" "Unattached Managed Disks" "PASS" "Info" \
+            "No unattached managed disks present." "" "Extended check (no CIS control)"
     else
         warn "12.1 $unattached unattached managed disk(s) found"
-        add_finding "12.1" "DataResources" "Unattached Managed Disks" "WARN" "Low" \
+        add_finding "EXT-DISK1" "DataResources" "Unattached Managed Disks" "WARN" "Low" \
             "$unattached unattached managed disk(s) found — orphaned disks may retain sensitive data and incur cost." \
             "Review and delete orphaned disks, or ensure they remain encrypted. Document retention justification." \
             "CIS 7.x | https://learn.microsoft.com/en-us/azure/virtual-machines/disks-find-unattached-portal"
@@ -1284,14 +1297,14 @@ assess_data_resources() {
     total_disks=$(echo "$disks" | jq 'length' 2>/dev/null || echo "0")
     if [[ "$total_disks" -eq 0 ]]; then
         info "12.2 No managed disks found"
-        add_finding "12.2" "DataResources" "Managed Disk Encryption" "PASS" "Info" "No managed disks in scope." "" "CIS 7.x"
+        add_finding "7.3" "DataResources" "Managed Disk Encryption" "PASS" "Info" "No managed disks in scope." "" "Extended check (no CIS control)"
     elif [[ "$platform_only" -eq 0 ]]; then
         pass "12.2 All disks use customer-managed or double encryption"
-        add_finding "12.2" "DataResources" "Managed Disk Encryption" "PASS" "Info" \
-            "All managed disks use CMK or enhanced encryption." "" "CIS 7.x"
+        add_finding "7.3" "DataResources" "Managed Disk Encryption" "PASS" "Info" \
+            "All managed disks use CMK or enhanced encryption." "" "Extended check (no CIS control)"
     else
         warn "12.2 $platform_only/$total_disks disk(s) use platform-managed keys only"
-        add_finding "12.2" "DataResources" "Managed Disk Encryption" "WARN" "Low" \
+        add_finding "7.3" "DataResources" "Managed Disk Encryption" "WARN" "Low" \
             "$platform_only of $total_disks managed disks use platform-managed keys only — consider CMK for sensitive workloads." \
             "Evaluate customer-managed keys (CMK) for disks holding sensitive data, for greater key control." \
             "CIS 7.x | https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption"
@@ -1302,7 +1315,7 @@ assess_data_resources() {
     local snapshots
     snapshots=$(az_query snapshot list --query "length(@)" -o tsv 2>/dev/null || echo "0")
     info "12.3 $snapshots snapshot(s) found"
-    add_finding "12.3" "DataResources" "Disk Snapshots" "MANUAL" "Low" \
+    add_finding "EXT-DISK2" "DataResources" "Disk Snapshots" "MANUAL" "Low" \
         "$snapshots disk snapshot(s) found. Review export/SAS access on each — snapshots can leak full disk contents." \
         "Ensure snapshots are not exposed via public SAS tokens. Apply RBAC and encryption." \
         "CIS 7.x | https://learn.microsoft.com/en-us/azure/virtual-machines/snapshot-copy-managed-disk"
@@ -1324,18 +1337,18 @@ assess_other_data() {
 
     if [[ "$cosmos_count" -eq 0 ]]; then
         info "13.1 No Cosmos DB accounts found"
-        add_finding "13.1" "PaaSData" "Cosmos DB Presence" "PASS" "Info" "No Cosmos DB accounts in scope." "" "CIS 4.x"
+        add_finding "4.5" "PaaSData" "Cosmos DB Presence" "PASS" "Info" "No Cosmos DB accounts in scope." "" "CIS 4.x"
     else
         # Check for accounts allowing access from all networks
         local open_cosmos
         open_cosmos=$(echo "$cosmos" | jq '[.[] | select((.ipRules | length)==0 and .isVirtualNetworkFilterEnabled==false)] | length' 2>/dev/null || echo "0")
         if [[ "$open_cosmos" -eq 0 ]]; then
             pass "13.1 All Cosmos DB accounts have network restrictions"
-            add_finding "13.1" "PaaSData" "Cosmos DB Network Access" "PASS" "Info" \
+            add_finding "4.5" "PaaSData" "Cosmos DB Network Access" "PASS" "Info" \
                 "All $cosmos_count Cosmos DB accounts restrict network access." "" "CIS 4.x"
         else
             fail "13.1 $open_cosmos Cosmos DB account(s) allow access from all networks"
-            add_finding "13.1" "PaaSData" "Cosmos DB Network Access" "FAIL" "High" \
+            add_finding "4.5" "PaaSData" "Cosmos DB Network Access" "FAIL" "High" \
                 "$open_cosmos Cosmos DB account(s) accept connections from any network — broad data exposure surface." \
                 "Configure IP firewall rules or VNet service endpoints / Private Endpoints on Cosmos DB accounts." \
                 "CIS 4.x | https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-configure-firewall"
@@ -1350,17 +1363,17 @@ assess_other_data() {
     redis_count=$(echo "$redis" | jq 'length' 2>/dev/null || echo "0")
     if [[ "$redis_count" -eq 0 ]]; then
         info "13.2 No Redis Cache instances found"
-        add_finding "13.2" "PaaSData" "Redis Cache" "PASS" "Info" "No Redis Cache instances in scope." "" "CIS 4.x"
+        add_finding "EXT-DB1" "PaaSData" "Redis Cache" "PASS" "Info" "No Redis Cache instances in scope." "" "CIS 4.x"
     else
         local nonssl
         nonssl=$(echo "$redis" | jq '[.[] | select(.enableNonSslPort==true)] | length' 2>/dev/null || echo "0")
         if [[ "$nonssl" -eq 0 ]]; then
             pass "13.2 All Redis Cache instances require SSL"
-            add_finding "13.2" "PaaSData" "Redis Non-SSL Port" "PASS" "Info" \
+            add_finding "EXT-DB1" "PaaSData" "Redis Non-SSL Port" "PASS" "Info" \
                 "All Redis Cache instances have the non-SSL port disabled." "" "CIS 4.x"
         else
             fail "13.2 $nonssl Redis Cache instance(s) allow non-SSL connections"
-            add_finding "13.2" "PaaSData" "Redis Non-SSL Port" "FAIL" "High" \
+            add_finding "EXT-DB1" "PaaSData" "Redis Non-SSL Port" "FAIL" "High" \
                 "$nonssl Redis Cache instance(s) have the non-SSL port (6379) enabled — data transmitted in cleartext." \
                 "Disable the non-SSL port. Use only the SSL port (6380) for all Redis connections." \
                 "CIS 4.x | https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-configure"
@@ -1375,10 +1388,10 @@ assess_other_data() {
     pg_count=$(echo "$pg" | jq 'length' 2>/dev/null || echo "0")
     if [[ "$pg_count" -eq 0 ]]; then
         info "13.3 No PostgreSQL flexible servers found"
-        add_finding "13.3" "PaaSData" "PostgreSQL Servers" "PASS" "Info" "No PostgreSQL flexible servers in scope." "" "CIS 4.x"
+        add_finding "4.3" "PaaSData" "PostgreSQL Servers" "PASS" "Info" "No PostgreSQL flexible servers in scope." "" "CIS 4.x"
     else
         info "13.3 $pg_count PostgreSQL server(s) found — verify SSL enforcement and firewall"
-        add_finding "13.3" "PaaSData" "PostgreSQL Servers" "MANUAL" "Medium" \
+        add_finding "4.3" "PaaSData" "PostgreSQL Servers" "MANUAL" "Medium" \
             "$pg_count PostgreSQL flexible server(s) found. Verify require_secure_transport=ON and firewall rules." \
             "Ensure SSL/TLS enforcement is enabled and firewall does not permit 0.0.0.0. Use Private Endpoints." \
             "CIS 4.x | https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-networking"
@@ -1401,18 +1414,18 @@ assess_containers() {
 
     if [[ "$aks_count" -eq 0 ]]; then
         info "14.1 No AKS clusters found"
-        add_finding "14.1" "Containers" "AKS Presence" "PASS" "Info" "No AKS clusters in scope." "" "CIS 8.x"
+        add_finding "EXT-AKS0" "Containers" "AKS Presence" "PASS" "Info" "No AKS clusters in scope." "" "CIS 8.x"
     else
         # RBAC enabled
         local no_rbac
         no_rbac=$(echo "$aks" | jq '[.[] | select(.enableRbac!=true)] | length' 2>/dev/null || echo "0")
         if [[ "$no_rbac" -eq 0 ]]; then
             pass "14.1 All AKS clusters have RBAC enabled"
-            add_finding "14.1" "Containers" "AKS RBAC" "PASS" "Info" \
+            add_finding "EXT-AKS1" "Containers" "AKS RBAC" "PASS" "Info" \
                 "All $aks_count AKS clusters have Kubernetes RBAC enabled." "" "CIS 8.x"
         else
             fail "14.1 $no_rbac AKS cluster(s) without RBAC"
-            add_finding "14.1" "Containers" "AKS RBAC" "FAIL" "High" \
+            add_finding "EXT-AKS1" "Containers" "AKS RBAC" "FAIL" "High" \
                 "$no_rbac AKS cluster(s) do not have RBAC enabled — no granular authorisation in-cluster." \
                 "Enable Kubernetes RBAC. Note RBAC cannot be enabled on existing clusters — requires recreation." \
                 "CIS 8.x | https://learn.microsoft.com/en-us/azure/aks/azure-ad-rbac"
@@ -1423,11 +1436,11 @@ assess_containers() {
         public_aks=$(echo "$aks" | jq '[.[] | select(.apiServerAccessProfile.enablePrivateCluster!=true)] | length' 2>/dev/null || echo "0")
         if [[ "$public_aks" -eq 0 ]]; then
             pass "14.2 All AKS clusters use private API servers"
-            add_finding "14.2" "Containers" "AKS Private Cluster" "PASS" "Info" \
+            add_finding "EXT-AKS2" "Containers" "AKS Private Cluster" "PASS" "Info" \
                 "All AKS clusters use private API server endpoints." "" "CIS 8.x"
         else
             warn "14.2 $public_aks AKS cluster(s) have public API servers"
-            add_finding "14.2" "Containers" "AKS Private Cluster" "WARN" "High" \
+            add_finding "EXT-AKS2" "Containers" "AKS Private Cluster" "WARN" "High" \
                 "$public_aks AKS cluster(s) expose the Kubernetes API server publicly." \
                 "Use private clusters or authorised IP ranges to restrict API server access." \
                 "CIS 8.x | https://learn.microsoft.com/en-us/azure/aks/private-clusters"
@@ -1442,17 +1455,17 @@ assess_containers() {
     acr_count=$(echo "$acr" | jq 'length' 2>/dev/null || echo "0")
     if [[ "$acr_count" -eq 0 ]]; then
         info "14.3 No Container Registries found"
-        add_finding "14.3" "Containers" "ACR Presence" "PASS" "Info" "No Container Registries in scope." "" "CIS 8.x"
+        add_finding "EXT-ACR0" "Containers" "ACR Presence" "PASS" "Info" "No Container Registries in scope." "" "CIS 8.x"
     else
         local admin_enabled
         admin_enabled=$(echo "$acr" | jq '[.[] | select(.adminUserEnabled==true)] | length' 2>/dev/null || echo "0")
         if [[ "$admin_enabled" -eq 0 ]]; then
             pass "14.3 No ACR with admin user enabled"
-            add_finding "14.3" "Containers" "ACR Admin User" "PASS" "Info" \
+            add_finding "EXT-ACR1" "Containers" "ACR Admin User" "PASS" "Info" \
                 "No Container Registries have the admin user account enabled." "" "CIS 8.x"
         else
             fail "14.3 $admin_enabled ACR(s) have admin user enabled"
-            add_finding "14.3" "Containers" "ACR Admin User" "FAIL" "Medium" \
+            add_finding "EXT-ACR1" "Containers" "ACR Admin User" "FAIL" "Medium" \
                 "$admin_enabled Container Registry/Registries have the admin user enabled — a single shared credential rather than per-identity access." \
                 "Disable the ACR admin user. Use Entra ID identities and RBAC / token-based access." \
                 "CIS 8.x | https://learn.microsoft.com/en-us/azure/container-registry/container-registry-authentication"
@@ -1497,7 +1510,8 @@ generate_json() {
           report: {
             title: "Azure CIS Benchmark Assessment",
             generated: $generated,
-            tool: "azure_cis_assessment.sh v1.1",
+            tool: "azure_cis_assessment.sh v2.0",
+            benchmark: "CIS Microsoft Azure Foundations Benchmark v6.0.0",
             author: "URM Consulting",
             subscription: { name: $sub_name, id: $sub_id, tenantId: $tenant_id },
             evidence: { directory: $evidence_dir, artifacts_captured: $evidence_count },
@@ -1555,6 +1569,7 @@ sev_class = {"Critical":"sev-critical","High":"sev-high","Medium":"sev-medium","
 row_parts = []
 for idx, f in enumerate(findings):
     cid = esc(f.get("cis_id"))
+    cid_class = "cid-ext" if str(f.get("cis_id","")).startswith("EXT") else "cid-cis"
     domain = esc(f.get("domain"))
     title = esc(f.get("title"))
     status = esc(f.get("status"))
@@ -1591,7 +1606,7 @@ for idx, f in enumerate(findings):
     toggle = f'<button class="ev-toggle" onclick="toggleEv({idx})">▸ {ev_count} cmd{"s" if ev_count!=1 else ""}</button>' if ev_count else '<span class="ev-none">—</span>'
 
     row_parts.append(f'''<tr class="finding-row" data-status="{status}">
-        <td><code>{cid}</code></td>
+        <td><code class="{cid_class}">{cid}</code></td>
         <td><span class='domain-badge'>{domain}</span></td>
         <td>{title}{affected_html}</td>
         <td><span class='status-badge {sc}'>{status}</span></td>
@@ -2010,6 +2025,7 @@ html = f"""<!DOCTYPE html>
     padding: 1px 5px;
     color: var(--accent);
   }}
+  code.cid-ext {{ color: var(--purple); border-color: rgba(188,140,255,0.3); }}
 
   /* ── Badges ── */
   .status-badge, .sev-badge, .domain-badge {{
@@ -2062,7 +2078,7 @@ html = f"""<!DOCTYPE html>
     <div>
       <div class="logo">URM Consulting — Security Assessment</div>
       <h1>Azure CIS Benchmark Report</h1>
-      <div class="subtitle">CIS Microsoft Azure Foundations Benchmark v3.x</div>
+      <div class="subtitle">CIS Microsoft Azure Foundations Benchmark v6.0.0</div>
       <div class="meta-pills">
         <div class="pill">Subscription: <span>{sub_name}</span></div>
         <div class="pill">ID: <span>{sub_id}</span></div>
@@ -2132,6 +2148,7 @@ html = f"""<!DOCTYPE html>
 
 <div class="footer">
   <p>Azure CIS Benchmark Assessment &mdash; URM Consulting &mdash; <a href="https://www.cisecurity.org/benchmark/azure">CIS Azure Foundations Benchmark</a></p>
+  <p style="margin-top:4px">Control IDs map to CIS Microsoft Azure Foundations Benchmark v6.0.0. IDs prefixed <code class="cid-ext">EXT-</code> are extended checks with no direct CIS control. <code>.x</code> denotes a section-level or Manual control.</p>
   <p style="margin-top:4px">This report is confidential and intended for authorised recipients only.</p>
 </div>
 
